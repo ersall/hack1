@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Apple Security</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #000;
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        #terminal {
+            padding: 15px;
+            height: 100vh;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .red { color: #f00; }
+        .yellow { color: #ff0; }
+        .cyan { color: #0ff; }
+        .magenta { color: #f0f; }
+        .blink { animation: blink 1s infinite; }
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+        #overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255,0,0,0.03);
+            pointer-events: none;
+            z-index: 999;
+        }
+        #fake-popup {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #111;
+            border: 2px solid #f00;
+            padding: 20px;
+            text-align: center;
+            z-index: 1000;
+            border-radius: 12px;
+            color: #f00;
+            font-family: -apple-system, sans-serif;
+            font-size: 16px;
+            width: 90%;
+            max-width: 320px;
+        }
+        #fake-popup button {
+            background: #f00;
+            color: #fff;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 8px;
+            margin-top: 15px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+
+<div id="terminal"></div>
+<div id="overlay"></div>
+
+<div id="fake-popup">
+    <div>⚠️ CRITICAL THREAT ⚠️</div>
+    <div style="font-size:12px;margin-top:8px;color:#fff;">Device compromised<br>Tap to remove threat</div>
+    <button onclick="document.getElementById('fake-popup').style.display='none'">REMOVE VIRUS</button>
+</div>
+
+<script>
+(function() {
+    const terminal = document.getElementById('terminal');
+    const overlay = document.getElementById('overlay');
+    const popup = document.getElementById('fake-popup');
+
+    function type(text, cls = '', delay = 30) {
+        return new Promise(resolve => {
+            let i = 0;
+            const span = document.createElement('span');
+            if (cls) span.className = cls;
+            terminal.appendChild(span);
+            terminal.scrollTop = terminal.scrollHeight;
+            const interval = setInterval(() => {
+                span.textContent += text[i];
+                terminal.scrollTop = terminal.scrollHeight;
+                i++;
+                if (i >= text.length) {
+                    clearInterval(interval);
+                    resolve();
+                }
+            }, delay);
+        });
+    }
+
+    function newline(count = 1) {
+        for (let i = 0; i < count; i++) {
+            terminal.appendChild(document.createTextNode('\n'));
+        }
+        terminal.scrollTop = terminal.scrollHeight;
+    }
+
+    function vibrate(duration = 200) {
+        if (navigator.vibrate) {
+            navigator.vibrate(duration);
+        }
+    }
+
+    function triggerPopup() {
+        popup.style.display = 'block';
+        vibrate([200, 100, 200, 100, 500]);
+        setTimeout(() => {
+            popup.style.display = 'none';
+        }, 5000);
+    }
+
+    async function run() {
+        // Захват fullscreen
+        try {
+            document.documentElement.requestFullscreen();
+        } catch(e) {}
+
+        // Блокировка выхода назад
+        window.location.hash = "hacked";
+        window.addEventListener('popstate', function() {
+            window.location.hash = "hacked";
+            vibrate(100);
+        });
+
+        // Фейковый терминал
+        await type('iPhone14,7 — iOS 17.4.1 — Kernel Darwin 23.0', '', 20);
+        newline();
+        await type('Establishing secure connection...', 'yellow', 25);
+        newline();
+        await type('Connected to rem0te_shell@darknet[.]onion:9050', 'cyan', 20);
+        newline(2);
+
+        vibrate(150);
+
+        await type('[+] Bypassing iOS Sandbox........', 'yellow', 30);
+        await type(' DONE', 'cyan', 15);
+        newline();
+        await type('[+] Escalating kernel privileges........', 'yellow', 30);
+        await type(' SUCCESS (uid=0)', 'cyan', 15);
+        newline();
+        await type('[+] Mounting root filesystem as writable........', 'yellow', 30);
+        await type(' OK', 'cyan', 15);
+        newline(2);
+
+        vibrate(200);
+
+        await type('[*] Dumping device information:', 'magenta', 25);
+        newline();
+        await type('    Device: iPhone 14 Pro Max', '', 15);
+        newline();
+        await type('    UDID: ' + 'A1B2C3D4-E5F6-7890-ABCD-EF1234567890', '', 15);
+        newline();
+        await type('    IMEI: ' + '35 678901 234567 8', '', 15);
+        newline();
+        await type('    Serial: ' + 'F4K3S3R14LN0', '', 15);
+        newline();
+        await type('    Apple ID: ' + '********@icloud.com', '', 15);
+        newline(2);
+
+        vibrate([100,50,100]);
+
+        await type('[*] Extracting sensitive data:', 'magenta', 25);
+        newline();
+        await type('[i] /var/mobile/Library/SMS........', 'yellow', 20);
+        await type(' 4,832 messages', '', 15);
+        newline();
+        await type('[i] /var/mobile/Library/CallHistory........', 'yellow', 20);
+        await type(' 1,247 calls', '', 15);
+        newline();
+        await type('[i] /var/mobile/Library/Accounts........', 'yellow', 20);
+        await type(' 3 accounts', '', 15);
+        newline();
+        await type('[i] /var/mobile/Media/DCIM........', 'yellow', 20);
+        await type(' 2,891 photos / 124 videos', '', 15);
+        newline();
+        await type('[i] /var/mobile/Containers/Data/WhatsApp........', 'yellow', 20);
+        await type(' decrypted', 'cyan', 15);
+        newline(2);
+
+        vibrate(300);
+
+        await type('[!] Keychain decrypted!', 'red', 20);
+        newline();
+        await type('[!] Extracting saved passwords:', 'red', 20);
+        newline();
+        await type('    iCloud: ********', '', 15);
+        newline();
+        await type('    Gmail: ********', '', 15);
+        newline();
+        await type('    Facebook: ********', '', 15);
+        newline();
+        await type('    Instagram: ********', '', 15);
+        newline();
+        await type('    Banking App: ********', '', 15);
+        newline(2);
+
+        vibrate([200,100,200,100,400]);
+
+        await type('[!] EXFILTRATING DATA...', 'red blink', 40);
+        newline();
+        await type('[████████████████████] 100% Complete', 'red', 20);
+        newline(2);
+
+        await type('[!] PERSISTENCE INSTALLED', 'red', 25);
+        newline();
+        await type('[!] BACKDOOR ACTIVE ON PORT 4444', 'red', 25);
+        newline();
+        await type('[!] DEVICE FULLY COMPROMISED', 'red blink', 30);
+        newline(2);
+
+        await type('END OF LINE_', 'cyan', 50);
+        newline(2);
+
+        triggerPopup();
+
+        // Заливка экрана красным мерцанием
+        setInterval(() => {
+            overlay.style.background = 'rgba(255,0,0,0.05)';
+            vibrate(50);
+            setTimeout(() => {
+                overlay.style.background = 'rgba(255,0,0,0.01)';
+            }, 100);
+        }, 2000);
+    }
+
+    run();
+})();
+</script>
+</body>
+</html>
